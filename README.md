@@ -191,22 +191,26 @@ only bursty transmissions with empty sections in between are considered.
 
 The original reference design without modifications looks something like this:
 
-```
-                             ---------------------
-                             |                   |
-            -------    -------------    -------  |
- Antenna -> | ADC | -> | JESD Link | -> | DMA | -------
-            -------    -------------    -------  |    |
-                             |                   |    |      -------
-                             |                   |    -----> |     |
-                             |    FPGA Fabric    |           | CPU |
-                             |                   |    ------ |     |
-                             |                   |    |      -------
-            -------    -------------    -------  |    |
- Antenna <- | DAC | <- | JESD Link | <- | DMA | <------
-            -------    -------------    -------  |
-                             |                   |
-                             ---------------------
+``` mermaid
+
+flowchart LR
+    ANT_RX((Antenna RX))
+    ANT_TX((Antenna TX))
+    ADC[ADC]
+    DAC[DAC]
+    CPU[(CPU)]
+
+    subgraph FPGA ["FPGA Fabric"]
+        JR[JESD Link RX]
+        RXDMA[RX DMA]
+        TXDMA[TX DMA]
+        JT[JESD Link TX]
+    end
+
+    ANT_RX --> ADC --> JR --> RXDMA --> CPU
+    CPU --> TXDMA --> JT --> DAC --> ANT_TX
+
+
 ```
 
 On a high level, to allow for timing synchronization, the RX DMAs input valid signal
@@ -215,22 +219,29 @@ same, or one with a fixed timing relationship to that of the RX DMA (To allow fo
 of processing or pipeline influences, JESD link latency compensation, etc.).
 
 
-```
-                             -------------------------------------
-                             |                                   |
-            -------    -------------                    -------  |
- Antenna -> | ADC | -> | JESD Link | -----------------> | DMA | -------
-            -------    -------------                 ^  -------  |    |
-                             |                       |           |    |      -------
-                             |                 --------------    |    -----> |     |
-                             |   FPGA Fabric   | TDD Engine |    |           | CPU |
-                             |                 --------------    |    ------ |     |
-                             |                       |           |    |      -------
-            -------    -------------                 v  -------  |    |
- Antenna <- | DAC | <- | JESD Link | <----------------- | DMA | <------
-            -------    -------------                    -------  |
-                             |                                   |
-                             -------------------------------------
+``` mermaid
+
+flowchart LR
+    ANT_RX((Antenna RX))
+    ANT_TX((Antenna TX))
+    ADC[ADC]
+    DAC[DAC]
+    CPU[(CPU)]
+
+    subgraph FPGA ["FPGA Fabric"]
+        JR[JESD Link RX]
+        RXDMA[RX DMA]
+        TDD[[TDD Engine: periodic pulses, configurable width/offset]]
+        TXDMA[TX DMA]
+        JT[JESD Link TX]
+    end
+
+    ANT_RX --> ADC --> JR --> RXDMA --> CPU
+    CPU --> TXDMA --> JT --> DAC --> ANT_TX
+
+    TDD -. |rx_sync: override input valid| .-> RXDMA
+    TDD -. |tx_sync: override output ready (fixed offset)| .-> TXDMA
+
 ```
 
 The Timing Division Duplexing (TDD) engine was used to generate periodic pulses with configurable
